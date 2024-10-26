@@ -181,7 +181,7 @@ def dist_cross_entropy(
     split_labels_here = seq_len // sp_size == logits.size(seq_dim)  # ring attn splits labels before forward
 
     # if sp_mode == "ring_attn":
-    if "ring_attn" in sp_mode:
+    if sp_mode is not None and "ring_attn" in sp_mode:
         # For Zigzag Ring Attention, labels should've been split and
         # shifted by RingAttention.prepare_varlen_batch()
         if sp_rank == 0:
