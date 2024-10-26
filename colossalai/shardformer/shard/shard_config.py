@@ -10,7 +10,15 @@ from colossalai.pipeline.stage_manager import PipelineStageManager
 from .grad_ckpt_config import GradientCheckpointConfig
 
 __all__ = ["ShardConfig"]
-SUPPORT_SP_MODE = ["split_gather", "ring", "all_to_all", "ring_attn"]
+SUPPORT_SP_MODE = [
+    "split_gather",
+    "ring",
+    "all_to_all",
+    "ring_attn",
+    "ring_attn_zig_zag",
+    "ring_attn_optimal",
+    "ring_attn_uniform",
+]
 
 
 @dataclass
