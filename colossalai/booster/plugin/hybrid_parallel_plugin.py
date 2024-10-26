@@ -43,7 +43,15 @@ from colossalai.zero.low_level.zero_hook import ZeroOpHook, wait_all_gather_hand
 
 from .pp_plugin_base import PipelinePluginBase
 
-SUPPORT_SP_MODE = ["split_gather", "ring", "all_to_all", "ring_attn"]
+SUPPORT_SP_MODE = [
+    "split_gather",
+    "ring",
+    "all_to_all",
+    "ring_attn",
+    "ring_attn_zig_zag",
+    "ring_attn_optimal",
+    "ring_attn_uniform",
+]
 
 PRECISION_TORCH_TYPE = {"fp16": torch.float16, "fp32": torch.float32, "bf16": torch.bfloat16}
 
@@ -195,7 +203,13 @@ class HybridParallelModule(ModelWrapper, AMPModelMixin):
         """
 
         if self.shard_config.enable_sequence_parallelism:
-            if self.shard_config.sequence_parallelism_mode in ["all_to_all", "ring_attn"]:
+            if self.shard_config.sequence_parallelism_mode in [
+                "all_to_all",
+                "ring_attn",
+                "ring_attn_zig_zag",
+                "ring_attn_optimal",
+                "ring_attn_uniform",
+            ]:
                 return
 
             if self.shard_config.sequence_parallelism_mode in ["split_gather", "ring"]:
@@ -1061,10 +1075,17 @@ class HybridParallelPlugin(PipelinePluginBase):
                     )
                 self.sp_size = 1
                 self.dp_size = dist.get_world_size() // (tp_size * pp_size)
-            elif self.sequence_parallelism_mode in ["all_to_all", "ring_attn"]:
+            elif self.sequence_parallelism_mode in [
+                "all_to_all",
+                "ring_attn",
+                "ring_attn_zig_zag",
+                "ring_attn_optimal",
+                "ring_attn_uniform",
+            ]:
                 self.sp_size = 1 if sp_size is None else sp_size
                 self.dp_size = dist.get_world_size() // (self.sp_size * pp_size * tp_size)
-                if self.sequence_parallelism_mode == "ring_attn":
+                # if self.sequence_parallelism_mode == "ring_attn":
+                if "ring_attn" in self.sequence_parallelism_mode:
                     enable_flash_attention = True
         else:
             self.dp_size = dist.get_world_size() // (tp_size * pp_size)
@@ -1087,7 +1108,8 @@ class HybridParallelPlugin(PipelinePluginBase):
         if dp_outside:
             self.dp_axis, self.pp_axis, self.tp_axis, self.sp_axis = 0, 1, 2, 3
             self.pg_mesh = ProcessGroupMesh(self.dp_size, self.pp_size, self.tp_size, self.sp_size)
-            if sequence_parallelism_mode == "ring_attn":
+            # if sequence_parallelism_mode == "ring_attn":
+            if "ring_attn" in self.sequence_parallelism_mode:
                 # Swap tp and sp since 2D Ring has better inter-node latency
                 self.pg_mesh = ProcessGroupMesh(self.dp_size, self.pp_size, self.sp_size, self.tp_size)
                 self.sp_axis = 2
@@ -1096,7 +1118,8 @@ class HybridParallelPlugin(PipelinePluginBase):
                 self.pg_mesh = ProcessGroupMesh(self.dp_size, self.pp_size, self.tp_size, self.sp_size)
         else:
             self.pp_axis, self.dp_axis, self.tp_axis, self.sp_axis = 0, 1, 2, 3
-            if sequence_parallelism_mode == "ring_attn":
+            # if sequence_parallelism_mode == "ring_attn":
+            if "ring_attn" in self.sequence_parallelism_mode:
                 self.pg_mesh = ProcessGroupMesh(self.pp_size, self.dp_size, self.sp_size, self.tp_size)
                 self.sp_axis = 2
                 self.tp_axis = 3
@@ -1145,12 +1168,13 @@ class HybridParallelPlugin(PipelinePluginBase):
                 )
             else:
                 raise NotImplementedError()
-        if sequence_parallelism_mode == "ring_attn":
-            if not parallel_output:
-                self.logger.warning(
-                    "parallel_output must be True for Zigzag Ring Attention, as we've not supported Zigzag all-gather yet.",
-                    ranks=[0],
-                )
+            # if sequence_parallelism_mode == "ring_attn":
+            if "ring_attn" in self.sequence_parallelism_mode:
+                if not parallel_output:
+                    self.logger.warning(
+                        "parallel_output must be True for Zigzag Ring Attention, as we've not supported Zigzag all-gather yet.",
+                        ranks=[0],
+                    )
                 parallel_output = True
 
         self.tp_group = self.pg_mesh.get_group_along_axis(self.tp_axis)

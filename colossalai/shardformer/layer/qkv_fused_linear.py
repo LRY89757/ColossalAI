@@ -376,7 +376,8 @@ class GPT2FusedLinearConv1D_Col(ParallelModule):
                 ring=self.seq_parallel_mode == "ring",
                 fp8_communication=self.fp8_communication,
             )
-        elif self.seq_parallel_mode is None or self.seq_parallel_mode == "ring_attn":
+        # elif self.seq_parallel_mode is None or self.seq_parallel_mode == "ring_attn":
+        elif self.seq_parallel_mode is None or "ring_attn" in self.seq_parallel_mode:
             # Set up backprop all-reduce.
             input_parallel = input_
             output_parallel = matmul_with_async_comm(
@@ -598,7 +599,8 @@ class GPT2FusedLinearConv1D_Row(ParallelModule):
                     handle.wait()
                 output = torch.cat(output_parallel_list, dim=-1)
         else:
-            if self.seq_parallel_mode is None or self.seq_parallel_mode == "ring_attn":
+            # if self.seq_parallel_mode is None or self.seq_parallel_mode == "ring_attn":
+            if self.seq_parallel_mode is None or "ring_attn" in self.seq_parallel_mode:
                 output_parallel = torch.matmul(input_, self.weight)
                 output = reduce_forward(output_parallel, self.process_group, fp8_communication=self.fp8_communication)
             elif is_share_sp_tp(self.seq_parallel_mode):

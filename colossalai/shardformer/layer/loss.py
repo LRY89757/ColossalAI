@@ -180,7 +180,8 @@ def dist_cross_entropy(
     is_sp = sp_size > 1 and (not is_share_sp_tp(sp_mode))
     split_labels_here = seq_len // sp_size == logits.size(seq_dim)  # ring attn splits labels before forward
 
-    if sp_mode == "ring_attn":
+    # if sp_mode == "ring_attn":
+    if "ring_attn" in sp_mode:
         # For Zigzag Ring Attention, labels should've been split and
         # shifted by RingAttention.prepare_varlen_batch()
         if sp_rank == 0:
@@ -235,7 +236,8 @@ def dist_cross_entropy(
         loss = loss_fct(logits, labels)
 
     # Reduce loss instead of gathering logits over seq dim for savings
-    if split_labels_here or sp_mode == "ring_attn":
+    # if split_labels_here or sp_mode == "ring_attn":
+    if split_labels_here or "ring_attn" in sp_mode:
         # Get the global non-zero count
         loss = torch.stack((loss, num_nonzero))
         # Rescale to offset the grad / (DP * SP) in HybridParallelPlugin
